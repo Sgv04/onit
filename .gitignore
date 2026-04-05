@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Docker
+.dockerignore
+# Мы не игнорируем docker-compose.yml, но игнорируем файлы с паролями
+.env
+
+# База данных (самое важное!)
+# Если у тебя данные Postgres лежат в папке проекта, игнорируем её
+pg_data/
+postgres_data/
+
+# IDE и ОС
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
