@@ -1,10 +1,12 @@
 import sys
+import os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QTableWidget, QTableWidgetItem, 
                              QLineEdit, QPushButton)
 from PyQt6.QtCore import Qt
-from models import Device, Session
+from models import Device, Session, init_db
 
+# --- ОКОННОЕ ПРИЛОЖЕНИЕ (ЛР1-2) ---
 class InventoryApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -16,7 +18,6 @@ class InventoryApp(QMainWindow):
 
     def init_ui(self):
         layout = QVBoxLayout()
-
         input_layout = QHBoxLayout()
         self.host_input = QLineEdit(placeholderText="Hostname")
         self.ip_input = QLineEdit(placeholderText="IP Address")
@@ -49,23 +50,19 @@ class InventoryApp(QMainWindow):
     def load_data(self):
         self.table.blockSignals(True) 
         self.table.setRowCount(0)
-        
         devices = self.session.query(Device).all()
         for i, device in enumerate(devices):
             self.table.insertRow(i)
             id_item = QTableWidgetItem(str(device.id))
             id_item.setFlags(id_item.flags() ^ Qt.ItemFlag.ItemIsEditable) 
-            
             self.table.setItem(i, 0, id_item)
             self.table.setItem(i, 1, QTableWidgetItem(device.hostname))
             self.table.setItem(i, 2, QTableWidgetItem(device.ip_address))
             self.table.setItem(i, 3, QTableWidgetItem(device.device_type))
-            
         self.table.blockSignals(False)
 
     def add_device(self):
         if not self.host_input.text(): return
-        
         new_device = Device(
             hostname=self.host_input.text(),
             ip_address=self.ip_input.text(),
@@ -79,36 +76,57 @@ class InventoryApp(QMainWindow):
         self.type_input.clear()
 
     def update_device(self, item):
-        row = item.row()
+        row, col = item.row(), item.column()
         device_id = int(self.table.item(row, 0).text())
-        col = item.column()
-        new_value = item.text()
-
         device = self.session.query(Device).filter(Device.id == device_id).first()
         if device:
-            if col == 1: device.hostname = new_value
-            elif col == 2: device.ip_address = new_value
-            elif col == 3: device.device_type = new_value
-            
+            if col == 1: device.hostname = item.text()
+            elif col == 2: device.ip_address = item.text()
+            elif col == 3: device.device_type = item.text()
             self.session.commit()
-            print(f"Устройство {device_id} обновлено.")
 
     def delete_device(self):
         current_row = self.table.currentRow()
         if current_row < 0: return
-        
         device_id = int(self.table.item(current_row, 0).text())
         device = self.session.query(Device).filter(Device.id == device_id).first()
-        
         if device:
             self.session.delete(device)
             self.session.commit()
             self.load_data()
 
+# --- ТОЧКА ВХОДА ---
 if __name__ == "__main__":
-    from models import init_db
     init_db() 
-    app = QApplication(sys.argv)
-    window = InventoryApp()
-    window.show()
-    sys.exit(app.exec())
+    
+    # Если Docker передал переменную RUN_MODE=WEB, запускаем API
+    if os.getenv("RUN_MODE") == "WEB":
+        import uvicorn
+        from fastapi import FastAPI
+        
+        web_app = FastAPI()
+
+        @web_app.get("/")
+        def read_root():
+            return {
+                "status": "online",
+                "node_name": os.getenv("HOSTNAME"),  # Покажет ID контейнера (доказательство балансировки)
+                "info": "ЛР№4: Работает через Nginx"
+            }
+
+        @web_app.get("/devices")
+        def get_all_devices():
+            session = Session()
+            devices = session.query(Device).all()
+            return [{"id": d.id, "host": d.hostname, "ip": d.ip_address} for d in devices]
+
+        print("Запуск WEB-сервера (FastAPI) для Docker...")
+        uvicorn.run(web_app, host="0.0.0.0", port=8000)
+    
+    else:
+        # Обычный запуск (ЛР1)
+        print("Запуск GUI (PyQt6)...")
+        app = QApplication(sys.argv)
+        window = InventoryApp()
+        window.show()
+        sys.exit(app.exec())
