@@ -24,6 +24,20 @@ services:
       - DB_NAME=${DB_NAME}
     depends_on:
       - db
+  app_node_3:
+    build: .
+    container_name: app_node_3
+    environment:
+      - RUN_MODE=gui
+      - DISPLAY=host.docker.internal:0.0
+      - DB_HOST=inventory_postgres
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
 
   gateway:
     image: nginx:latest
