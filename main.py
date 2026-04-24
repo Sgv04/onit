@@ -97,34 +97,54 @@ class InventoryApp(QMainWindow):
 
 # --- ТОЧКА ВХОДА ---
 if __name__ == "__main__":
-    init_db() 
-    
-    # Если Docker передал переменную RUN_MODE=WEB, запускаем API
+    init_db()
+
     if os.getenv("RUN_MODE") == "WEB":
         import uvicorn
         from fastapi import FastAPI
-        
+
         web_app = FastAPI()
 
+        #endpoint 
+        @web_app.get("/health")
+        def health():
+            return {
+                "status": "ok",
+                "service": "inventory-api"
+            }
+
+        # главный endpoint 
         @web_app.get("/")
         def read_root():
             return {
-                "status": "online",
-                "node_name": os.getenv("HOSTNAME"),  # Покажет ID контейнера (доказательство балансировки)
-                "info": "ЛР№4: Работает через Nginx"
+                "status": "DEPLOY OK 🚀",
+                "node_name": os.getenv("HOSTNAME"),
+                "mode": "WEB",
+                "version": "1.0-cicd-test"
             }
 
+        #безопасное получение данных (исправленная версия)
         @web_app.get("/devices")
         def get_all_devices():
             session = Session()
-            devices = session.query(Device).all()
-            return [{"id": d.id, "host": d.hostname, "ip": d.ip_address} for d in devices]
+            try:
+                devices = session.query(Device).all()
+                return [
+                    {
+                        "id": d.id,
+                        "hostname": d.hostname,
+                        "ip": d.ip_address,
+                        "type": d.device_type
+                    }
+                    for d in devices
+                ]
+            finally:
+                session.close()
 
         print("Запуск WEB-сервера (FastAPI) для Docker...")
         uvicorn.run(web_app, host="0.0.0.0", port=8000)
-    
+
     else:
-        # Обычный запуск (ЛР1)
         print("Запуск GUI (PyQt6)...")
         app = QApplication(sys.argv)
         window = InventoryApp()
