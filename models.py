@@ -26,14 +26,13 @@ Session = sessionmaker(bind=engine)
 
 def init_db():
     retries = 5
-    while retries > 0:
+    for i in range (0, 5, 1):
         try:
-            Base.metadata.create_all(engine)
+            
+            Base.metadata.create_all(engine, checkfirst=True)
             print("БАЗА ДАННЫХ: Таблицы успешно созданы/проверены.")
             break
-        except OperationalError:
-            retries -= 1
-            print(f"БАЗА ДАННЫХ: Ожидание готовности Postgres... (осталось попыток: {retries})")
+        except:
             time.sleep(3) # Ждем 3 секунды перед следующей попыткой
     else:
         print("ОШИБКА: Не удалось подключиться к базе данных после нескольких попыток.")
